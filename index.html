@@ -120,19 +120,40 @@
       <div class="hint" id="blockedLine"></div>
     </div>
     <div class="card">
-      <b>Cost of lost time (per year)</b>
-      <div class="row">
-        <div><label for="rate">Hourly cost ($)</label><input id="rate" type="number" inputmode="decimal" min="0" step="1"></div>
-        <div><label for="people">People affected</label><input id="people" type="number" inputmode="numeric" min="1" step="1"></div>
-      </div>
+      <b>Downtime profile</b>
+      <table style="margin-top:6px">
+        <tbody>
+          <tr><td>Issues per workday</td><td class="n" id="mIssuesDay">0</td></tr>
+          <tr><td>Average minutes per issue</td><td class="n" id="mAvgIssue">0</td></tr>
+          <tr><td>Longest single issue</td><td class="n" id="mLongest">0 min</td></tr>
+          <tr><td>Share of an 8-hr workday lost</td><td class="n" id="mPctDay">0%</td></tr>
+          <tr><td>Worst day in range</td><td class="n" id="mWorstDay">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <b>Annual impact — apply to your team</b>
+      <div class="hint" style="margin-top:4px">Add a row for each group of people with the same hourly cost.</div>
+      <div id="roster"></div>
+      <button class="link" id="addGroup">+ Add group</button>
       <label for="workdays">Workdays per year</label>
       <input id="workdays" type="number" inputmode="numeric" min="1" step="1">
-      <div style="margin-top:14px">Estimated annual cost: <div class="big" id="annual">$0</div></div>
-      <div class="hint">Minutes lost per workday (above) × workdays × people × hourly cost. Workdays in the range are Mon–Fri from your first logged issue to today.</div>
+      <table style="margin-top:14px">
+        <thead><tr><th>Group</th><th class="n">People</th><th class="n">Hours lost / yr</th><th class="n">Cost / yr</th></tr></thead>
+        <tbody id="impactTable"></tbody>
+        <tfoot><tr><th>Total</th><th class="n" id="tPeople">0</th><th class="n" id="tHours">0</th><th class="n" id="tCost">$0</th></tr></tfoot>
+      </table>
+      <div class="stats" style="margin-top:14px;margin-bottom:0">
+        <div class="stat"><b id="kCost" style="color:var(--red)">$0</b><span>annual cost</span></div>
+        <div class="stat"><b id="kHours">0</b><span>hours lost / yr</span></div>
+        <div class="stat"><b id="kDays">0</b><span>workdays lost / person / yr</span></div>
+      </div>
+      <div class="hint">Projection: minutes lost per workday (from this log, for the selected range) × workdays per year, applied to each person. Assumes each person loses about as much time as the person logging. Workdays in range = Mon–Fri from the first logged issue to today.</div>
     </div>
     <button class="btn" id="exportBtn">Export CSV (all entries)</button>
     <button class="btn ghost" id="copyBtn">Copy CSV to clipboard</button>
     <div class="hint" id="lastExport"></div>
+    <div class="hint" style="text-align:center">v1.1.0</div>
   </section>
 </main>
 
@@ -180,9 +201,11 @@
     if (!d) d = mem || {};
     if (!Array.isArray(d.events)) d.events = [];
     if (!d.settings) d.settings = {};
-    if (d.settings.rate == null) d.settings.rate = "";
-    if (d.settings.people == null) d.settings.people = 1;
     if (d.settings.workdays == null) d.settings.workdays = 240;
+    if (!Array.isArray(d.settings.groups)) {
+      d.settings.groups = [{ label: "Staff", people: d.settings.people || 1, rate: d.settings.rate || "" }];
+    }
+    delete d.settings.rate; delete d.settings.people;
     if (d.running === undefined) d.running = null;
     if (d.lastExport === undefined) d.lastExport = null;
     return d;
@@ -356,12 +379,39 @@
       renderReport();
     });
   });
-  $("rate").value = state.settings.rate;
-  $("people").value = state.settings.people;
   $("workdays").value = state.settings.workdays;
-  ["rate","people","workdays"].forEach(function(id){
-    $(id).addEventListener("input", function(){ state.settings[id] = $(id).value; save(); renderReport(); });
+  $("workdays").addEventListener("input", function(){ state.settings.workdays = $("workdays").value; save(); renderReport(); });
+
+  function renderRoster(){
+    var box=$("roster"); box.innerHTML="";
+    state.settings.groups.forEach(function(g, i){
+      var wrap=document.createElement("div");
+      wrap.style.cssText="border-top:1px solid var(--line);margin-top:12px;padding-top:4px";
+      function field(lbl, key, type, attrs){
+        var d=document.createElement("div");
+        var l=document.createElement("label"); l.textContent=lbl;
+        var inp=document.createElement("input"); inp.type=type; inp.value=g[key];
+        Object.keys(attrs||{}).forEach(function(k){ inp.setAttribute(k, attrs[k]); });
+        inp.addEventListener("input", function(){ g[key]=inp.value; save(); renderReport(); });
+        d.appendChild(l); d.appendChild(inp); return d;
+      }
+      wrap.appendChild(field("Group / role", "label", "text", {placeholder:"e.g. Technicians"}));
+      var row=document.createElement("div"); row.className="row";
+      row.appendChild(field("People", "people", "number", {inputmode:"numeric", min:"0", step:"1"}));
+      row.appendChild(field("Hourly cost ($)", "rate", "number", {inputmode:"decimal", min:"0", step:"0.01"}));
+      wrap.appendChild(row);
+      if (state.settings.groups.length > 1){
+        var rm=document.createElement("button"); rm.className="link"; rm.style.color="var(--red)"; rm.textContent="Remove group";
+        rm.addEventListener("click", function(){ state.settings.groups.splice(i,1); save(); renderRoster(); renderReport(); });
+        wrap.appendChild(rm);
+      }
+      box.appendChild(wrap);
+    });
+  }
+  $("addGroup").addEventListener("click", function(){
+    state.settings.groups.push({label:"", people:1, rate:""}); save(); renderRoster(); renderReport();
   });
+  renderRoster();
 
   function inRange(){
     if (range==="all") return state.events.slice();
@@ -389,8 +439,35 @@
     });
     if (!tb.childNodes.length){ var tr=document.createElement("tr"); var td=document.createElement("td"); td.colSpan=3; td.textContent="No issues in this range."; tr.appendChild(td); tb.appendChild(tr); }
     $("blockedLine").textContent = evs.length ? (blocked+" of "+evs.length+" issues blocked a work task · "+wd+" workday"+(wd===1?"":"s")+" in range") : "";
-    var rate=parseFloat(state.settings.rate)||0, ppl=parseFloat(state.settings.people)||0, days=parseFloat(state.settings.workdays)||0;
-    $("annual").textContent = money(perDay/60*days*ppl*rate);
+    // downtime profile
+    var longest=0, byDay={};
+    evs.forEach(function(e){ if(e.minutes>longest) longest=e.minutes; var k=dayKey(e.start); byDay[k]=(byDay[k]||0)+e.minutes; });
+    var worstK=null; Object.keys(byDay).forEach(function(k){ if(worstK===null||byDay[k]>byDay[worstK]) worstK=k; });
+    $("mIssuesDay").textContent = evs.length ? round1(evs.length/wd) : 0;
+    $("mAvgIssue").textContent = evs.length ? round1(total/evs.length)+" min" : "0 min";
+    $("mLongest").textContent = round1(longest)+" min";
+    $("mPctDay").textContent = round1(perDay/480*100)+"%";
+    $("mWorstDay").textContent = worstK ? (dayLabel(worstK).replace(/, \d{4}$/,"")+" · "+round1(byDay[worstK])+" min") : "—";
+
+    // annual impact across groups
+    var days=parseFloat(state.settings.workdays)||0;
+    var hrsPerPerson = perDay/60*days;
+    var it=$("impactTable"); it.innerHTML="";
+    var tP=0, tH=0, tC=0;
+    state.settings.groups.forEach(function(g){
+      var p=parseFloat(g.people)||0, r=parseFloat(g.rate)||0;
+      var h=hrsPerPerson*p, c=h*r;
+      tP+=p; tH+=h; tC+=c;
+      var tr=document.createElement("tr");
+      [g.label||"(unnamed)", p, Math.round(h).toLocaleString(), money(c)].forEach(function(v,i){ var td=document.createElement("td"); if(i) td.className="n"; td.textContent=v; tr.appendChild(td); });
+      it.appendChild(tr);
+    });
+    $("tPeople").textContent = tP;
+    $("tHours").textContent = Math.round(tH).toLocaleString();
+    $("tCost").textContent = money(tC);
+    $("kCost").textContent = money(tC);
+    $("kHours").textContent = Math.round(tH).toLocaleString();
+    $("kDays").textContent = round1(hrsPerPerson/8);
     $("lastExport").textContent = state.lastExport ? "Last export: "+new Date(state.lastExport).toLocaleString() : "Not exported yet.";
   }
 
