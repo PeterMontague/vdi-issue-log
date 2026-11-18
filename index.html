@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VDI Issue Log</title>
+<meta name="theme-color" content="#1f3a5f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Issue Log">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root{--bg:#f4f6f9;--card:#fff;--ink:#1b2430;--muted:#5f6b7a;--line:#dde3ea;--pri:#1f3a5f;--red:#b42318;--redbg:#fde8e7;--ok:#1a7f37}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  header{background:var(--pri);color:#fff;padding:calc(env(safe-area-inset-top) + 12px) 16px 12px}
+  header h1{margin:0;font-size:19px}
+  header .today{font-size:14px;opacity:.9;margin-top:2px}
+  nav{display:flex;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+  nav button{flex:1;border:0;background:none;padding:13px 0;font-size:15px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent}
+  nav button.on{color:var(--pri);border-bottom-color:var(--pri)}
+  main{padding:14px 14px calc(env(safe-area-inset-bottom) + 24px);max-width:640px;margin:0 auto}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .cat{border:1px solid var(--line);background:var(--card);border-radius:14px;padding:16px 10px;min-height:84px;font-size:15px;font-weight:600;color:var(--ink);text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .cat:active{background:#e8eef6}
+  .hint{color:var(--muted);font-size:13px;margin:12px 2px}
+  .link{background:none;border:0;color:var(--pri);font-weight:600;font-size:15px;padding:10px 2px;text-decoration:underline}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+  .running{background:var(--redbg);border-color:#f3b8b3;text-align:center}
+  .running .lbl{font-weight:700;color:var(--red)}
+  .running .clock{font-size:52px;font-weight:700;font-variant-numeric:tabular-nums;margin:6px 0 10px}
+  .btn{display:block;width:100%;border:0;border-radius:12px;padding:15px;font-size:17px;font-weight:700;background:var(--pri);color:#fff;margin-top:8px}
+  .btn.red{background:var(--red)}
+  .btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  .row{display:flex;gap:8px}.row>*{flex:1}
+  label{display:block;font-size:14px;font-weight:600;color:var(--muted);margin:12px 0 4px}
+  input,select,textarea{width:100%;font-size:16px;padding:11px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font-family:inherit}
+  textarea{min-height:64px;resize:vertical}
+  .chk{display:flex;align-items:center;gap:10px;margin-top:14px;font-weight:600}
+  .chk input{width:24px;height:24px}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+  .stat b{display:block;font-size:22px}
+  .stat span{font-size:12px;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:8px 4px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600}
+  td.n,th.n{text-align:right}
+  .day{font-weight:700;color:var(--muted);font-size:13px;margin:16px 2px 6px;text-transform:uppercase;letter-spacing:.03em}
+  .ev{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+  .ev .t{font-weight:600}
+  .ev .m{font-size:13px;color:var(--muted)}
+  .ev .del{border:0;background:none;color:var(--red);font-size:14px;font-weight:600;padding:4px}
+  .tag{display:inline-block;font-size:11px;font-weight:700;background:var(--redbg);color:var(--red);border-radius:6px;padding:1px 6px;margin-left:4px}
+  .seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:12px}
+  .seg button{flex:1;border:0;background:#fff;padding:10px;font-weight:600;color:var(--muted)}
+  .seg button.on{background:var(--pri);color:#fff}
+  .big{font-size:28px;font-weight:700;color:var(--red)}
+  .warn{background:#fff7e0;border:1px solid #f0d58a;color:#6b4e00;border-radius:12px;padding:10px 12px;font-size:14px;margin-bottom:12px}
+  .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 20px);transform:translateX(-50%);background:#1b2430;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
+  .toast.show{opacity:1}
+  .hide{display:none!important}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:10}
+  .sheet{background:#fff;width:100%;max-width:640px;border-radius:18px 18px 0 0;padding:18px 16px calc(env(safe-area-inset-bottom) + 18px);max-height:92vh;overflow:auto}
+  .sheet h2{margin:0 0 4px;font-size:19px}
+</style>
+</head>
+<body>
+<header>
+  <h1>VDI Issue Log</h1>
+  <div class="today" id="todayLine">Today: 0 issues · 0 min lost</div>
+</header>
+<nav>
+  <button data-tab="log" class="on">Log</button>
+  <button data-tab="history">History</button>
+  <button data-tab="report">Report</button>
+</nav>
+<main>
+  <!-- LOG -->
+  <section id="tab-log">
+    <div id="backupWarn" class="warn hide"></div>
+    <div id="runningCard" class="card running hide">
+      <div class="lbl" id="runLabel"></div>
+      <div class="clock" id="runClock">0:00</div>
+      <button class="btn red" id="stopBtn">STOP — issue resolved</button>
+      <button class="btn ghost" id="cancelRun">Cancel (logged by mistake)</button>
+    </div>
+    <div id="startArea">
+      <div class="hint">Tap the problem when it starts. Tap STOP when you're working again.</div>
+      <div class="grid" id="catGrid"></div>
+      <button class="link" id="addMissed">+ Add an issue I forgot to time</button>
+    </div>
+  </section>
+
+  <!-- HISTORY -->
+  <section id="tab-history" class="hide">
+    <div id="histList"></div>
+  </section>
+
+  <!-- REPORT -->
+  <section id="tab-report" class="hide">
+    <div class="seg" id="rangeSeg">
+      <button data-r="7">7 days</button>
+      <button data-r="30" class="on">30 days</button>
+      <button data-r="all">All</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="sCount">0</b><span>issues</span></div>
+      <div class="stat"><b id="sHours">0</b><span>hours lost</span></div>
+      <div class="stat"><b id="sPerDay">0</b><span>min / workday</span></div>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>Issue</th><th class="n">Count</th><th class="n">Minutes</th></tr></thead>
+        <tbody id="catTable"></tbody>
+      </table>
+      <div class="hint" id="blockedLine"></div>
+    </div>
+    <div class="card">
+      <b>Cost of lost time (per year)</b>
+      <div class="row">
+        <div><label for="rate">Hourly cost ($)</label><input id="rate" type="number" inputmode="decimal" min="0" step="1"></div>
+        <div><label for="people">People affected</label><input id="people" type="number" inputmode="numeric" min="1" step="1"></div>
+      </div>
+      <label for="workdays">Workdays per year</label>
+      <input id="workdays" type="number" inputmode="numeric" min="1" step="1">
+      <div style="margin-top:14px">Estimated annual cost: <div class="big" id="annual">$0</div></div>
+      <div class="hint">Minutes lost per workday (above) × workdays × people × hourly cost. Workdays in the range are Mon–Fri from your first logged issue to today.</div>
+    </div>
+    <button class="btn" id="exportBtn">Export CSV (all entries)</button>
+    <button class="btn ghost" id="copyBtn">Copy CSV to clipboard</button>
+    <div class="hint" id="lastExport"></div>
+  </section>
+</main>
+
+<!-- SAVE / ADD SHEET -->
+<div class="modal hide" id="modal">
+  <div class="sheet">
+    <h2 id="mTitle">Save issue</h2>
+    <div class="hint" id="mSub"></div>
+    <div id="mCatWrap"><label for="mCat">Issue</label><select id="mCat"></select></div>
+    <div id="mWhenWrap"><label for="mWhen">When it started</label><input id="mWhen" type="datetime-local"></div>
+    <label for="mMin">Minutes lost</label>
+    <input id="mMin" type="number" inputmode="decimal" min="0" step="0.5">
+    <label class="chk"><input type="checkbox" id="mBlocked"> It blocked a work task</label>
+    <label for="mNote">Note (optional) — no Novo confidential info</label>
+    <textarea id="mNote" placeholder="e.g. kicked out mid-ticket, had to log back in twice"></textarea>
+    <button class="btn" id="mSave">Save</button>
+    <button class="btn ghost" id="mCancel">Cancel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  var CATS = [
+    "Guest Wi-Fi login",
+    "Logged out / session dropped",
+    "Slow / lagging",
+    "Can't connect / won't open",
+    "MFA / re-sign-in prompt",
+    "Lost unsaved work",
+    "Printer / device problem",
+    "Other"
+  ];
+  var KEY = "vdiLog.v1";
+  var mem = null; // in-memory fallback if storage blocked
+  var storageOK = true;
+
+  function load(){
+    var raw = null;
+    try { raw = localStorage.getItem(KEY); } catch(e){ storageOK = false; }
+    var d = null;
+    try { d = raw ? JSON.parse(raw) : null; } catch(e){ d = null; }
+    if (!d) d = mem || {};
+    if (!Array.isArray(d.events)) d.events = [];
+    if (!d.settings) d.settings = {};
+    if (d.settings.rate == null) d.settings.rate = "";
+    if (d.settings.people == null) d.settings.people = 1;
+    if (d.settings.workdays == null) d.settings.workdays = 240;
+    if (d.running === undefined) d.running = null;
+    if (d.lastExport === undefined) d.lastExport = null;
+    return d;
+  }
+  function save(){
+    mem = state;
+    try { localStorage.setItem(KEY, JSON.stringify(state)); }
+    catch(e){ storageOK = false; }
+  }
+  var state = load();
+
+  var $ = function(id){ return document.getElementById(id); };
+  function toast(msg){ var t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toast._t); toast._t=setTimeout(function(){t.classList.remove("show");},2200); }
+  function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+  function pad(n){ return (n<10?"0":"")+n; }
+  function round1(n){ return Math.round(n*10)/10; }
+  function fmtClock(ms){ var s=Math.floor(ms/1000), h=Math.floor(s/3600), m=Math.floor((s%3600)/60), x=s%60; return (h? h+":"+pad(m) : m)+":"+pad(x); }
+  function fmtTime(ts){ var d=new Date(ts); var h=d.getHours(), m=d.getMinutes(); var ap=h>=12?"PM":"AM"; h=h%12||12; return h+":"+pad(m)+" "+ap; }
+  function dayKey(ts){ var d=new Date(ts); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+  function dayLabel(key){ var p=key.split("-"); var d=new Date(+p[0],+p[1]-1,+p[2]); return d.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric",year:"numeric"}); }
+  function toLocalInput(ts){ var d=new Date(ts); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes()); }
+  function fromLocalInput(v){ var t = new Date(v).getTime(); return isNaN(t) ? null : t; }
+  function money(n){ return "$" + Math.round(n).toLocaleString(); }
+  function workdaysBetween(a,b){ // inclusive, Mon-Fri
+    var d=new Date(a); d.setHours(0,0,0,0); var end=new Date(b); end.setHours(0,0,0,0);
+    var n=0; while(d<=end){ var w=d.getDay(); if(w!==0&&w!==6) n++; d.setDate(d.getDate()+1); }
+    return Math.max(n,1);
+  }
+
+  // ---------- tabs ----------
+  var navBtns = document.querySelectorAll("nav button");
+  function show(tab){
+    navBtns.forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-tab")===tab); });
+    ["log","history","report"].forEach(function(t){ $("tab-"+t).classList.toggle("hide", t!==tab); });
+    if (tab==="history") renderHistory();
+    if (tab==="report") renderReport();
+    window.scrollTo(0,0);
+  }
+  navBtns.forEach(function(b){ b.addEventListener("click", function(){ show(b.getAttribute("data-tab")); }); });
+
+  // ---------- log tab ----------
+  var grid = $("catGrid");
+  CATS.forEach(function(c){
+    var b=document.createElement("button"); b.className="cat"; b.textContent=c;
+    b.addEventListener("click", function(){ startTimer(c); });
+    grid.appendChild(b);
+    var o=document.createElement("option"); o.value=c; o.textContent=c; $("mCat").appendChild(o);
+  });
+
+  var tick=null;
+  function startTimer(cat){
+    if (state.running) return;
+    state.running = { cat: cat, start: Date.now() };
+    save(); renderLog();
+    if (navigator.vibrate) { try{ navigator.vibrate(30); }catch(e){} }
+  }
+  function renderLog(){
+    var r = state.running;
+    $("runningCard").classList.toggle("hide", !r);
+    $("startArea").classList.toggle("hide", !!r);
+    clearInterval(tick);
+    if (r){
+      $("runLabel").textContent = r.cat + " — started " + fmtTime(r.start);
+      var upd=function(){ $("runClock").textContent = fmtClock(Date.now()-r.start); };
+      upd(); tick=setInterval(upd,1000);
+    }
+    renderToday();
+    renderBackupWarn();
+  }
+  $("cancelRun").addEventListener("click", function(){
+    state.running=null; save(); renderLog(); toast("Timer cancelled");
+  });
+  $("stopBtn").addEventListener("click", function(){
+    var r=state.running; if(!r) return;
+    var mins = round1((Date.now()-r.start)/60000);
+    openSheet({mode:"stop", cat:r.cat, start:r.start, mins:mins});
+  });
+  $("addMissed").addEventListener("click", function(){
+    openSheet({mode:"add", cat:CATS[0], start:Date.now(), mins:""});
+  });
+
+  // ---------- sheet ----------
+  var sheetCtx=null;
+  function openSheet(ctx){
+    sheetCtx=ctx;
+    var stop = ctx.mode==="stop";
+    $("mTitle").textContent = stop ? "Save issue" : "Add an issue";
+    $("mSub").textContent = stop ? (ctx.cat+" · started "+fmtTime(ctx.start)) : "For an issue you didn't time.";
+    $("mCatWrap").classList.toggle("hide", stop);
+    $("mWhenWrap").classList.toggle("hide", stop);
+    $("mCat").value = ctx.cat;
+    $("mWhen").value = toLocalInput(ctx.start);
+    $("mMin").value = ctx.mins;
+    $("mBlocked").checked = false;
+    $("mNote").value = "";
+    $("modal").classList.remove("hide");
+  }
+  function closeSheet(){ $("modal").classList.add("hide"); sheetCtx=null; }
+  $("mCancel").addEventListener("click", closeSheet);
+  $("mSave").addEventListener("click", function(){
+    if(!sheetCtx) return;
+    var mins = parseFloat($("mMin").value);
+    if (isNaN(mins) || mins<0){ toast("Enter minutes lost"); $("mMin").focus(); return; }
+    var start = sheetCtx.mode==="stop" ? sheetCtx.start : fromLocalInput($("mWhen").value);
+    if (start==null){ toast("Enter when it started"); return; }
+    var cat = sheetCtx.mode==="stop" ? sheetCtx.cat : $("mCat").value;
+    state.events.push({
+      id: uid(), start: start, minutes: round1(mins), category: cat,
+      blocked: $("mBlocked").checked, note: $("mNote").value.trim(),
+      timed: sheetCtx.mode==="stop"
+    });
+    if (sheetCtx.mode==="stop") state.running=null;
+    save(); closeSheet(); renderLog(); toast("Saved · "+round1(mins)+" min");
+  });
+
+  // ---------- today / backup ----------
+  function renderToday(){
+    var k=dayKey(Date.now()), n=0, m=0;
+    state.events.forEach(function(e){ if(dayKey(e.start)===k){ n++; m+=e.minutes; } });
+    $("todayLine").textContent = "Today: "+n+" issue"+(n===1?"":"s")+" · "+round1(m)+" min lost";
+  }
+  function renderBackupWarn(){
+    var w=$("backupWarn"), msg="";
+    if (!storageOK) msg="This browser is blocking storage — entries will be lost when you close it. Open the link in Safari or Chrome.";
+    else if (state.events.length){
+      var last = state.lastExport, week = 7*864e5;
+      if (!last) msg="Back up your log: Report → Export CSV. Entries live only on this phone.";
+      else if (Date.now()-last > week) msg="It's been over a week since your last backup. Report → Export CSV.";
+    }
+    w.textContent=msg; w.classList.toggle("hide", !msg);
+  }
+
+  // ---------- history ----------
+  function renderHistory(){
+    var list=$("histList"); list.innerHTML="";
+    if (!state.events.length){ list.innerHTML='<div class="hint">No issues logged yet.</div>'; return; }
+    var evs = state.events.slice().sort(function(a,b){ return b.start-a.start; });
+    var cur=null, box=null;
+    evs.forEach(function(e){
+      var k=dayKey(e.start);
+      if (k!==cur){
+        cur=k;
+        var tot=0; evs.forEach(function(x){ if(dayKey(x.start)===k) tot+=x.minutes; });
+        var h=document.createElement("div"); h.className="day"; h.textContent=dayLabel(k)+" · "+round1(tot)+" min"; list.appendChild(h);
+        box=document.createElement("div"); box.className="card"; list.appendChild(box);
+      }
+      var row=document.createElement("div"); row.className="ev"; if (box.childNodes.length) row.style.cssText="border-top:1px solid var(--line);padding-top:10px;margin-top:10px";
+      var left=document.createElement("div");
+      var t=document.createElement("div"); t.className="t"; t.textContent=e.category;
+      if (e.blocked){ var tg=document.createElement("span"); tg.className="tag"; tg.textContent="BLOCKED WORK"; t.appendChild(tg); }
+      var m=document.createElement("div"); m.className="m"; m.textContent=fmtTime(e.start)+" · "+e.minutes+" min"+(e.timed?"":" (entered)");
+      left.appendChild(t); left.appendChild(m);
+      if (e.note){ var nt=document.createElement("div"); nt.className="m"; nt.textContent=e.note; left.appendChild(nt); }
+      var del=document.createElement("button"); del.className="del"; del.textContent="Delete";
+      del.addEventListener("click", function(){
+        if (del.getAttribute("data-armed")){
+          state.events = state.events.filter(function(x){ return x.id!==e.id; });
+          save(); renderHistory(); renderToday(); toast("Deleted");
+        } else { del.setAttribute("data-armed","1"); del.textContent="Tap to confirm"; setTimeout(function(){ if(del.isConnected){ del.removeAttribute("data-armed"); del.textContent="Delete"; } },3000); }
+      });
+      row.appendChild(left); row.appendChild(del); box.appendChild(row);
+    });
+  }
+
+  // ---------- report ----------
+  var range="30";
+  document.querySelectorAll("#rangeSeg button").forEach(function(b){
+    b.addEventListener("click", function(){
+      range=b.getAttribute("data-r");
+      document.querySelectorAll("#rangeSeg button").forEach(function(x){ x.classList.toggle("on", x===b); });
+      renderReport();
+    });
+  });
+  $("rate").value = state.settings.rate;
+  $("people").value = state.settings.people;
+  $("workdays").value = state.settings.workdays;
+  ["rate","people","workdays"].forEach(function(id){
+    $(id).addEventListener("input", function(){ state.settings[id] = $(id).value; save(); renderReport(); });
+  });
+
+  function inRange(){
+    if (range==="all") return state.events.slice();
+    var cut = Date.now() - (+range)*864e5;
+    return state.events.filter(function(e){ return e.start>=cut; });
+  }
+  function renderReport(){
+    var evs=inRange(), total=0, blocked=0, by={};
+    CATS.forEach(function(c){ by[c]={n:0,m:0}; });
+    evs.forEach(function(e){ total+=e.minutes; if(e.blocked) blocked++; if(!by[e.category]) by[e.category]={n:0,m:0}; by[e.category].n++; by[e.category].m+=e.minutes; });
+    var first=null; state.events.forEach(function(e){ if(first===null||e.start<first) first=e.start; });
+    var from = first;
+    if (range!=="all" && first!==null) from = Math.max(first, Date.now()-(+range)*864e5);
+    var wd = from===null ? 1 : workdaysBetween(from, Date.now());
+    var perDay = evs.length ? total/wd : 0;
+    $("sCount").textContent = evs.length;
+    $("sHours").textContent = round1(total/60);
+    $("sPerDay").textContent = round1(perDay);
+    var tb=$("catTable"); tb.innerHTML="";
+    Object.keys(by).sort(function(a,b){ return by[b].m-by[a].m; }).forEach(function(c){
+      if(!by[c].n) return;
+      var tr=document.createElement("tr");
+      [c, by[c].n, round1(by[c].m)].forEach(function(v,i){ var td=document.createElement("td"); if(i) td.className="n"; td.textContent=v; tr.appendChild(td); });
+      tb.appendChild(tr);
+    });
+    if (!tb.childNodes.length){ var tr=document.createElement("tr"); var td=document.createElement("td"); td.colSpan=3; td.textContent="No issues in this range."; tr.appendChild(td); tb.appendChild(tr); }
+    $("blockedLine").textContent = evs.length ? (blocked+" of "+evs.length+" issues blocked a work task · "+wd+" workday"+(wd===1?"":"s")+" in range") : "";
+    var rate=parseFloat(state.settings.rate)||0, ppl=parseFloat(state.settings.people)||0, days=parseFloat(state.settings.workdays)||0;
+    $("annual").textContent = money(perDay/60*days*ppl*rate);
+    $("lastExport").textContent = state.lastExport ? "Last export: "+new Date(state.lastExport).toLocaleString() : "Not exported yet.";
+  }
+
+  // ---------- export ----------
+  function csvCell(v){ v = v==null ? "" : String(v); return /[",\n\r]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
+  function buildCSV(){
+    var rows=[["Date","Start time","Issue","Minutes lost","Blocked work task","Timed or entered","Note"]];
+    state.events.slice().sort(function(a,b){ return a.start-b.start; }).forEach(function(e){
+      rows.push([dayKey(e.start), fmtTime(e.start), e.category, e.minutes, e.blocked?"Yes":"No", e.timed?"Timed":"Entered", e.note]);
+    });
+    return rows.map(function(r){ return r.map(csvCell).join(","); }).join("\r\n");
+  }
+  function markExported(){ state.lastExport=Date.now(); save(); renderReport(); renderBackupWarn(); }
+  $("exportBtn").addEventListener("click", function(){
+    if (!state.events.length){ toast("Nothing to export yet"); return; }
+    var name = "vdi-issue-log-"+dayKey(Date.now())+".csv";
+    var blob = new Blob(["﻿"+buildCSV()], {type:"text/csv"});
+    try {
+      var file = new File([blob], name, {type:"text/csv"});
+      if (navigator.canShare && navigator.canShare({files:[file]})){
+        navigator.share({files:[file], title:name}).then(markExported).catch(function(){});
+        return;
+      }
+    } catch(e){}
+    var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+    markExported();
+  });
+  $("copyBtn").addEventListener("click", function(){
+    if (!state.events.length){ toast("Nothing to copy yet"); return; }
+    var text=buildCSV();
+    var done=function(){ markExported(); toast("CSV copied — paste into an email or Excel"); };
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done).catch(fallback);
+    } else fallback();
+    function fallback(){
+      var ta=document.createElement("textarea"); ta.value=text; ta.setAttribute("readonly",""); ta.style.position="fixed"; ta.style.opacity="0";
+      document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+      var ok=false; try{ ok=document.execCommand("copy"); }catch(e){}
+      ta.remove(); ok ? done() : toast("Copy failed — use Export instead");
+    }
+  });
+
+  // keep timer accurate after phone sleeps / app reopens
+  document.addEventListener("visibilitychange", function(){ if(!document.hidden){ state=load(); renderLog(); } });
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); });
+  }
+
+  renderLog();
+})();
+</script>
+</body>
+</html>
